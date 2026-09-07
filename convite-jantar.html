@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#7a4a10">
+<title>Um convite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="convite-jantar.css">
+</head>
+<body>
+
+<div class="frame"></div>
+<div class="canvas-wrap">
+  <div class="art" id="art"><img src="arte-fundo.png" alt="Girassóis sob o céu da Noite Estrelada"></div>
+  <svg class="grain" width="100%" height="100%" preserveAspectRatio="none">
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#n)"/>
+  </svg>
+  <div class="scrim"></div>
+
+  <div class="content">
+    <div class="stage">
+      <div class="eyebrow">um convite, meio impressionista</div>
+      <h1>Você janta <em>comigo</em>?</h1>
+      <p class="sub">Escolhi um lugar bonito e reservei a mesa na minha cabeça — só falta combinar com você.</p>
+      <div class="choices">
+        <button id="btn-yes">Sim, vamos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="btn-no">Não</button>
+
+<div class="panel" id="panel">
+  <div class="card">
+    <div class="handle"></div>
+    <button class="close" id="btn-close" aria-label="Fechar">✕</button>
+    <h2>Combinado 🌻</h2>
+    <p class="desc">Escolha o dia e o horário que funcionam pra você.</p>
+    <div class="field">
+      <label for="data">Data</label>
+      <input type="date" id="data">
+    </div>
+    <div class="field">
+      <label for="hora">Horário</label>
+      <input type="time" id="hora">
+    </div>
+    <button id="btn-send">Confirmar jantar</button>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+
+  // --- "não" dodges cursor and touch, iOS-friendly ---
+  const noBtn = document.getElementById('btn-no');
+
+  function placeRandom(){
+    const margin = 70;
+    const w = window.innerWidth, h = window.innerHeight;
+    const bw = noBtn.offsetWidth || 110, bh = noBtn.offsetHeight || 50;
+    const left = margin + Math.random() * Math.max(1, w - bw - margin*2);
+    const top = margin + Math.random() * Math.max(1, h - bh - margin*2 - 100);
+    noBtn.style.left = left + "px";
+    noBtn.style.top = top + "px";
+    noBtn.classList.add('dodging');
+    setTimeout(()=> noBtn.classList.remove('dodging'), 260);
+  }
+
+  function initPos(){
+    const yesRect = document.getElementById('btn-yes').getBoundingClientRect();
+    let left = yesRect.right + 16;
+    let top = yesRect.top;
+    if(left + 120 > window.innerWidth){
+      left = yesRect.left;
+      top = yesRect.bottom + 16;
+    }
+    noBtn.style.left = left + "px";
+    noBtn.style.top = top + "px";
+  }
+  initPos();
+  window.addEventListener('resize', initPos);
+  window.addEventListener('orientationchange', ()=> setTimeout(initPos, 200));
+
+  const DODGE_RADIUS = 120;
+  function maybeDodge(x, y){
+    const r = noBtn.getBoundingClientRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    const dist = Math.hypot(x - cx, y - cy);
+    if(dist < DODGE_RADIUS) placeRandom();
+  }
+  window.addEventListener('mousemove', (e)=> maybeDodge(e.clientX, e.clientY));
+  window.addEventListener('touchstart', (e)=>{ const t=e.touches[0]; maybeDodge(t.clientX, t.clientY); }, {passive:true});
+  window.addEventListener('touchmove', (e)=>{ const t=e.touches[0]; maybeDodge(t.clientX, t.clientY); }, {passive:true});
+  noBtn.addEventListener('click', (e)=>{ e.preventDefault(); placeRandom(); });
+  noBtn.addEventListener('focus', ()=> placeRandom());
+
+  // --- "sim" opens the panel ---
+  const panel = document.getElementById('panel');
+  document.getElementById('btn-yes').addEventListener('click', ()=>{
+    panel.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  });
+  function closePanel(){ panel.classList.remove('open'); document.body.style.overflow = ''; }
+  document.getElementById('btn-close').addEventListener('click', closePanel);
+  panel.addEventListener('click', (e)=>{ if(e.target === panel) closePanel(); });
+
+  // --- send to discord webhook ---
+  const WEBHOOK_URL = "https://discord.com/api/webhooks/1543253503529590785/cTUBbUMeBSxUSS23Ixe0CnDfbXB87q7vKrYcwpl7pJD7HMSxDAgR_ne8mb26mpJk5DpW";
+  const statusEl = document.getElementById('status');
+  const sendBtn = document.getElementById('btn-send');
+
+  sendBtn.addEventListener('click', async ()=>{
+    const data = document.getElementById('data').value;
+    const hora = document.getElementById('hora').value;
+    if(!data || !hora){ statusEl.textContent = "Escolha a data e o horário."; return; }
+
+    statusEl.textContent = "Enviando...";
+    sendBtn.disabled = true;
+
+    const [ano, mes, dia] = data.split('-');
+    const dataFormatada = `${dia}/${mes}/${ano}`;
+
+    const payload = {
+      embeds: [{
+        title: "🌻 Convite para jantar confirmado",
+        color: 15125294,
+        fields: [
+          { name: "Data", value: dataFormatada, inline: true },
+          { name: "Horário", value: hora, inline: true }
+        ]
+      }]
+    };
+
+    try{
+      await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      statusEl.textContent = "Enviado! Nos vemos lá. 🌻";
+    }catch(err){
+      statusEl.textContent = "Não consegui enviar agora, tente de novo.";
+      sendBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
